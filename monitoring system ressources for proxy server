@@ -1,10 +1,132 @@
 #!/bin/bash
 
-# Get CPU Usage
-cpu_usage=$(top -bn1 | grep "Cpu(s)" | awk '{print $2+$4}')
+display_top_cpu() {
+    echo "Top 10 Processes by CPU Usage:"
+    echo "------------------------------"
+    ps -eo pid,comm,%cpu --sort=-%cpu | head -n 11 | awk 'NR==1{print "PID\tCOMMAND\tCPU%"} NR>1{printf "%-8s %-20s %s\n", $1, $2, $3}'
+    echo
+}
+# Script to monitor network statistics on a proxy server
+
+# Output file for logging
+LOG_FILE="/var/log/network_monitor.log"
+
+# Timestamp
+TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
+
+# Function to get the number of concurrent connections
+get_concurrent_connections() {
+    # Using `ss` for modern systems
+    local connections=$(ss -ant | grep ESTAB | wc -l)
+    echo "$connections"
+}
+
+# Function to get packet drops
+get_packet_drops() {
+    # Parse packet drops from `/proc/net/dev`
+    local drops=$(grep -E 'eth0|ens33' /proc/net/dev | awk '{sum += $4 + $10} END {print sum}')
+    echo "$drops"
+}
+
+# Function to get data transferred in and out (MB)
+get_data_transferred() {
+    # Use `ifstat` for network statistics
+    local stats=$(ifstat -i eth0 1 1 | tail -n 1 | awk '{print $1, $2}')
+    echo "$stats"
+}
+
+# Log current network stats
+log_network_stats() {
+    local connections=$(get_concurrent_connections)
+    local drops=$(get_packet_drops)
+    local data=$(get_data_transferred)
+    
+    echo "$TIMESTAMP" >> $LOG_FILE
+    echo "Concurrent Connections: $connections" >> $LOG_FILE
+    echo "Packet Drops: $drops" >> $LOG_FILE
+    echo "Data Transferred (in MB): $data" >> $LOG_FILE
+    echo "----------------------------------------" >> $LOG_FILE
+}
+
+# Script to monitor disk usage and highlight partitions using more than 80% of space
+
+# Output file for logging
+LOG_FILE="/var/log/disk_usage_monitor.log"
+
+# Timestamp
+TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
+
+# Function to check disk usage
+check_disk_usage() {
+    # Get disk usage details
+    df -h | awk '
+    BEGIN {
+        print "Disk Usage Report:"
+        print "--------------------"
+    }
+    NR==1 {
+        next
+    }
+    {
+        partition=$1
+        use_percent=$5
+        gsub(/%/, "", use_percent)
+        if (use_percent > 80) {
+            printf "%-25s %-10s %s\n", partition, $3, use_percent"%"
+        }
+    }
+    '
+}
+
+# Log disk usage stats
+log_disk_usage() {
+    echo "$TIMESTAMP" >> $LOG_FILE
+    echo "Disk Usage Report:" >> $LOG_FILE
+    echo "--------------------" >> $LOG_FILE
+    check_disk_usage >> $LOG_FILE
+    echo "----------------------------------------" >> $LOG_FILE
+}
+
+# Script to monitor system load and CPU usage
+
+# Output file for logging
+LOG_FILE="/var/log/system_load_cpu_monitor.log"
+
+# Timestamp
+TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
+
+# Function to get system load
+get_system_load() {
+    # Get average system load from uptime command
+    uptime | awk -F 'load average:' '{ print $2 }' | awk '{print "1 min: "$1", 5 min: "$2", 15 min: "$3}'
+}
+
+# Function to get CPU usage breakdown
+get_cpu_usage() {
+    # Use vmstat for a breakdown of CPU usage
+    vmstat 1 2 | tail -n 1 | awk '{printf "User: %.1f%%\nSystem: %.1f%%\nIdle: %.1f%%\n", $13, $14, $15}'
+}
+
+# Log system load and CPU usage
+log_system_stats() {
+    local system_load=$(get_system_load)
+    local cpu_usage=$(get_cpu_usage)
+    
+    echo "$TIMESTAMP" >> $LOG_FILE
+    echo "System Load Average:" >> $LOG_FILE
+    echo "$system_load" >> $LOG_FILE
+    echo >> $LOG_FILE
+    echo "CPU Usage Breakdown:" >> $LOG_FILE
+    echo "$cpu_usage" >> $LOG_FILE
+    echo "----------------------------------------" >> $LOG_FILE
+}
+
 
 # Get Memory Usage
-memory_usage=$(free | grep Mem | awk '{print $3/$2 * 100.0}')
+total_mem=$(grep MemTotal /proc/meminfo | awk '{print $2 }')
+free_mem=$(grep Memfree /proc/meminfo | awk '{print $3 }')
+available_mem=$(grep Mem_available /proc/meminfo | awk '{print $4 }')
+used_mem=$((total_mem-free_mem))
 
 # Get Disk Usage
 disk_usage=$(df -h / | grep -Eo '[0-9]+%')
@@ -13,6 +135,10 @@ disk_usage=$(df -h / | grep -Eo '[0-9]+%')
 timestamp=$(date +"%Y-%m-%d %H:%M:%S")
 
 # Print Report
+echo "Total Memory: ${total_mem} MB"
+echo "Used Memory: ${used_mem} MB"
+echo "Free Memory: ${free_mem} MB"
+
 echo "=== System Usage Report ==="
 echo "Timestamp: $timestamp"
 echo "CPU Usage: $cpu_usage%"
