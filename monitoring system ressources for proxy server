@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# Get CPU Usage
+cpu_usage=$(top -bn1 | grep "Cpu(s)" | awk '{print $2+$4}')
+
+# Get Memory Usage
+memory_usage=$(free | grep Mem | awk '{print $3/$2 * 100.0}')
+
+# Get Disk Usage
+disk_usage=$(df -h / | grep -Eo '[0-9]+%')
+
+# Get current timestamp
+timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+
+# Print Report
+echo "=== System Usage Report ==="
+echo "Timestamp: $timestamp"
+echo "CPU Usage: $cpu_usage%"
+echo "Memory Usage: $memory_usage%"
+echo "Disk Usage: $disk_usage on /"
+
+# Save to a file (optional)
+report_file="usage_report_$(date +"%Y%m%d_%H%M%S").txt"
+echo -e "\n=== System Usage Report ===" >> $report_file
+echo "Timestamp: $timestamp" >> $report_file
+echo "CPU Usage: $cpu_usage%" >> $report_file
+echo "Memory Usage: $memory_usage%" >> $report_file
+echo "Disk Usage: $disk_usage on /" >> $report_file
+
+echo "Report saved to: $report_file"
